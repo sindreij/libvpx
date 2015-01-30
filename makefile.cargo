@@ -1,0 +1,298 @@
+CC ?= gcc
+AR ?= ar
+
+CFLAGS += -iquote $(OUT_DIR) -iquote . -DINLINE=inline -O2 -fPIC
+
+YASMFLAGS += -I$(OUT_DIR) -I.
+
+ifneq ($(findstring x86_64,$(TARGET)),)
+YASM ?= yasm
+YASMFLAGS += -m amd64
+
+ifneq ($(findstring darwin,$(TARGET)),)
+YASMFLAGS += -f macho64
+else ifneq ($(findstring linux,$(TARGET)),)
+YASMFLAGS += -f elf64
+endif
+
+else ifneq ($(findstring i686,$(TARGET)),)
+YASM ?= yasm
+YASMFLAGS += -m x86
+
+ifneq ($(findstring darwin,$(TARGET)),)
+YASMFLAGS += -f macho32
+else ifneq ($(findstring linux,$(TARGET)),)
+YASMFLAGS += -f elf32
+endif
+
+else ifneq ($(findstring arm,$(TARGET)),)
+YASM ?= as
+
+endif
+
+VP8_COMMON_SRC = \
+	$(addprefix vp8/common/,\
+		generic/systemdependent.c \
+		alloccommon.c \
+		blockd.c \
+		debugmodes.c \
+		dequantize.c \
+		entropy.c \
+		entropymode.c \
+		entropymv.c \
+		extend.c \
+		filter.c \
+		findnearmv.c \
+		idct_blk.c \
+		idctllm.c \
+		loopfilter.c \
+		loopfilter_filters.c \
+		mbpitch.c \
+		mfqe.c \
+		modecont.c \
+		postproc.c \
+		quant_common.c \
+		reconinter.c \
+		reconintra.c \
+		reconintra4x4.c \
+		rtcd.c \
+		sad_c.c \
+		setupintrarecon.c \
+		swapyv12buffer.c \
+		variance_c.c \
+	)
+
+VP8_COMMON_X86_SRC = \
+	$(addprefix vp8/common/x86/,\
+		filter_x86.c \
+		idct_blk_mmx.c \
+		idct_blk_sse2.c \
+		loopfilter_x86.c \
+		recon_wrapper_sse2.c \
+		variance_mmx.c \
+		variance_sse2.c \
+		variance_ssse3.c \
+		vp8_asm_stubs.c \
+	)
+
+VP8_COMMON_X86_ASM_SRC = \
+	$(addprefix vp8/common/x86/,\
+		dequantize_mmx.asm \
+		idctllm_mmx.asm \
+		idctllm_sse2.asm \
+		iwalsh_sse2.asm \
+		loopfilter_block_sse2_x86_64.asm \
+		loopfilter_mmx.asm \
+		loopfilter_sse2.asm \
+		mfqe_sse2.asm \
+		postproc_sse2.asm \
+		recon_mmx.asm \
+		recon_sse2.asm \
+		sad_ssse3.asm \
+		subpixel_mmx.asm \
+		subpixel_sse2.asm \
+		subpixel_ssse3.asm \
+		variance_impl_mmx.asm \
+		variance_impl_sse2.asm \
+		variance_impl_ssse3.asm \
+	)
+
+VP8_DECODER_SRC = \
+	$(addprefix vp8/,\
+		vp8_dx_iface.c \
+	) \
+	$(addprefix vp8/decoder/,\
+		dboolhuff.c \
+		decodemv.c \
+		decodeframe.c \
+		detokenize.c \
+		onyxd_if.c \
+	)
+
+VPX_MEM_SRC = \
+	$(addprefix vpx_mem/,\
+		vpx_mem.c \
+		vpx_mem_tracker.c)
+
+VPX_PORTS_ASM = \
+	$(addprefix vpx_ports/,\
+		emms.asm)
+
+VPX_SCALE_SRC = \
+	$(addprefix vpx_scale/, \
+		vpx_scale_rtcd.c) \
+	$(addprefix vpx_scale/generic/,\
+		gen_scalers.c \
+		vpx_scale.c \
+		yv12config.c \
+		yv12extend.c)
+
+VPX_SRC = \
+	$(addprefix vpx/src/,\
+		vpx_codec.c \
+		vpx_decoder.c \
+		vpx_encoder.c \
+		vpx_image.c \
+		vpx_psnr.c)
+
+ROOT_SRC = \
+	ivfdec.c \
+	tools_common.c \
+	video_reader.c
+
+ifneq ($(findstring x86_64,$(TARGET)),)
+LIBVPX_SRC = \
+	$(VP8_COMMON_SRC) \
+	$(VP8_COMMON_X86_SRC) \
+	$(VP8_DECODER_SRC) \
+	$(VPX_MEM_SRC) \
+	$(VPX_SCALE_SRC) \
+	$(VPX_SRC) \
+	$(ROOT_SRC)
+
+LIBVPX_ASM_SRC = \
+	$(VP8_COMMON_X86_ASM_SRC) \
+	$(VPX_PORTS_ASM)
+else ifneq ($(findstring i686,$(TARGET)),)
+LIBVPX_SRC = \
+	$(VP8_COMMON_SRC) \
+	$(VP8_COMMON_X86_SRC) \
+	$(VP8_DECODER_SRC) \
+	$(VPX_MEM_SRC) \
+	$(VPX_SCALE_SRC) \
+	$(VPX_SRC) \
+	$(ROOT_SRC)
+
+LIBVPX_ASM_SRC = \
+	$(VP8_COMMON_X86_ASM_SRC) \
+	$(VPX_PORTS_ASM)
+else ifneq ($(findstring arm,$(TARGET)),)
+LIBVPX_SRC = \
+	$(VP8_COMMON_SRC) \
+	$(VP8_DECODER_SRC) \
+	$(VPX_MEM_SRC) \
+	$(VPX_SCALE_SRC) \
+	$(VPX_SRC) \
+	$(ROOT_SRC)
+
+LIBVPX_ASM_SRC =
+endif
+
+LIBVPX_OBJS = \
+	$(patsubst %.c,$(OUT_DIR)/%.o,$(LIBVPX_SRC)) \
+	$(patsubst %.asm,$(OUT_DIR)/%.o,$(LIBVPX_ASM_SRC))
+
+GENERATED_HEADERS = \
+	$(addprefix $(OUT_DIR)/,\
+		vpx_config.h \
+		vpx_config.asm \
+		vp8_rtcd.h \
+		vpx_scale_rtcd.h \
+		vpx_version.h)
+
+.PHONY: all clean
+
+all: $(OUT_DIR)/libvpx.a
+
+clean:
+	rm -f $(OUT_DIR)/libvpx.a $(OUT_DIR)/*.h $(OUT_DIR)/*.asm $(LIBVPX_OBJS)
+
+$(OUT_DIR)/vpx_config:
+	echo "ARCH_X86_64=yes" >> $@
+	echo "CONFIG_POSTPROC=yes" >> $@
+	echo "CONFIG_VP9_POSTPROC=no" >> $@
+	echo "CONFIG_ERROR_CONCEALMENT=no" >> $@
+	echo "CONFIG_PIC=yes" >> $@
+	echo "CONFIG_SPATIAL_RESAMPLING=yes" >> $@
+	echo "CONFIG_VP8_DECODER=yes" >> $@
+	echo "HAVE_MMX=yes" >> $@
+	echo "HAVE_PTHREAD_H=yes" >> $@
+	echo "HAVE_SSE2=yes" >> $@
+	echo "HAVE_SSSE3=yes" >> $@
+
+$(OUT_DIR)/vpx_config.h:
+	echo "#ifndef VPX_CONFIG_H" > $@
+	echo "#define VPX_CONFIG_H" >> $@
+	echo "#define ARCH_X86_64 1" >> $@
+	echo "#define CONFIG_POSTPROC 1" >> $@
+	echo "#define CONFIG_VP9_POSTPROC 0" >> $@
+	echo "#define CONFIG_ERROR_CONCEALMENT 0" >> $@
+	echo "#define CONFIG_PIC 1" >> $@
+	echo "#define CONFIG_SPATIAL_RESAMPLING yes" >> $@
+	echo "#define CONFIG_VP8_DECODER 1" >> $@
+	echo "#define HAVE_MMX 1" >> $@
+	echo "#define HAVE_PTHREAD_H 1" >> $@
+	echo "#define HAVE_SSE2 1" >> $@
+	echo "#define HAVE_SSSE3 1" >> $@
+	echo "#endif" >> $@
+
+ifneq ($(findstring x86_64,$(TARGET)),)
+$(OUT_DIR)/vpx_config.asm:
+	echo "%ifndef VPX_CONFIG_ASM" > $@
+	echo "%define VPX_CONFIG_ASM 1" >> $@
+	echo "%define ARCH_X86_64 1" >> $@
+	echo "%define CONFIG_POSTPROC 1" >> $@
+	echo "%define CONFIG_VP9_POSTPROC 0" >> $@
+	echo "%define CONFIG_ERROR_CONCEALMENT 0" >> $@
+	echo "%define CONFIG_PIC 1" >> $@
+	echo "%define CONFIG_SPATIAL_RESAMPLING yes" >> $@
+	echo "%define CONFIG_VP8_DECODER 1" >> $@
+	echo "%define HAVE_MMX 1" >> $@
+	echo "%define HAVE_PTHREAD_H 1" >> $@
+	echo "%define HAVE_SSE2 1" >> $@
+	echo "%define HAVE_SSSE3 1" >> $@
+	echo "%endif" >> $@
+else ifneq ($(findstring i686,$(TARGET)),)
+$(OUT_DIR)/vpx_config.asm:
+	echo "%ifndef VPX_CONFIG_ASM" > $@
+	echo "%define VPX_CONFIG_ASM 1" >> $@
+	echo "%define ARCH_X86 1" >> $@
+	echo "%define CONFIG_POSTPROC 1" >> $@
+	echo "%define CONFIG_VP9_POSTPROC 0" >> $@
+	echo "%define CONFIG_ERROR_CONCEALMENT 0" >> $@
+	echo "%define CONFIG_PIC 1" >> $@
+	echo "%define CONFIG_SPATIAL_RESAMPLING yes" >> $@
+	echo "%define CONFIG_VP8_DECODER 1" >> $@
+	echo "%define HAVE_MMX 1" >> $@
+	echo "%define HAVE_PTHREAD_H 1" >> $@
+	echo "%define HAVE_SSE2 1" >> $@
+	echo "%define HAVE_SSSE3 1" >> $@
+	echo "%endif" >> $@
+else ifneq ($(findstring arm,$(TARGET)),)
+$(OUT_DIR)/vpx_config.asm:
+	echo "%ifndef VPX_CONFIG_ASM" > $@
+	echo "%define VPX_CONFIG_ASM 1" >> $@
+	echo "%define ARCH_ARM 1" >> $@
+	echo "%define CONFIG_POSTPROC 1" >> $@
+	echo "%define CONFIG_VP9_POSTPROC 0" >> $@
+	echo "%define CONFIG_ERROR_CONCEALMENT 0" >> $@
+	echo "%define CONFIG_PIC 1" >> $@
+	echo "%define CONFIG_SPATIAL_RESAMPLING yes" >> $@
+	echo "%define CONFIG_VP8_DECODER 1" >> $@
+	echo "%endif" >> $@
+endif
+
+$(OUT_DIR)/vp8_rtcd.h:	vp8/common/rtcd_defs.pl $(OUT_DIR)/vpx_config
+	build/make/rtcd.pl --arch=x86 --sym=vp8_rtcd --config=$(OUT_DIR)/vpx_config $< > $@
+
+$(OUT_DIR)/vpx_scale_rtcd.h:
+	echo "%endif" >> $@
+
+$(OUT_DIR)/vp8_rtcd.h:	vp8/common/rtcd_defs.pl $(OUT_DIR)/vpx_config
+	build/make/rtcd.pl --arch=x86 --sym=vp8_rtcd --config=$(OUT_DIR)/vpx_config $< > $@
+
+$(OUT_DIR)/vpx_scale_rtcd.h:	vpx_scale/vpx_scale_rtcd.pl $(OUT_DIR)/vpx_config
+	build/make/rtcd.pl --arch=x86 --sym=vp8_scale_rtcd --config=$(OUT_DIR)/vpx_config $< > $@
+
+$(OUT_DIR)/vpx_version.h:
+	build/make/version.sh . $@
+
+$(OUT_DIR)/%.o: %.c	$(GENERATED_HEADERS)
+	mkdir -p `dirname $@` && $(CC) -c $(CFLAGS) -o $@ $<
+
+$(OUT_DIR)/%.o: %.asm	$(GENERATED_HEADERS)
+	mkdir -p `dirname $@` && $(YASM) $(YASMFLAGS) -o $@ $<
+
+$(OUT_DIR)/libvpx.a: $(LIBVPX_OBJS)
+	$(AR) rcs $@ $(LIBVPX_OBJS)
+

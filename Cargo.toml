@@ -1,0 +1,13 @@
+[package]
+
+name = "libvpx-sys"
+version = "0.1.0"
+authors = ["The WebM Project Developers"]
+
+build = "build.rs"
+
+[lib]
+
+name = "libvpx-sys"
+path = "lib.rs"
+
